@@ -46,7 +46,6 @@ const setiap_5menit = '*/10 * * * *';
 
 schedule.scheduleJob(setiap_5menit, () => {
     const cek_bri = new CekBRI(config, transporter);
-    console.log('ok');
 })
 
 const Mutasi = require('./model/mutasi.model')
@@ -56,7 +55,7 @@ app.get('/', (req, res) => {
         resp.forEach((mts, i, arr)=>{
             mutasi += `${mts.nama_trx}: Rp${mts.nama_trx}</br>`
         })
-        res.json(mutasi);
+        res.send(mutasi);
     })
 })
 

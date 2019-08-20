@@ -3,7 +3,6 @@ var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
 var MutasiSchema = new Schema({
-    "_id": String, //tgl + trf masuk + saldo saat ini
     "tgl": Date,
     "nama_trx": String,
     "trf_masuk": Number,

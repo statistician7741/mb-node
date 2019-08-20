@@ -29,6 +29,7 @@ module.exports = class CekBRI {
         this._prepareMutasiDom = '';
         this._mutasiDom = '';
         this._step;
+        this._transaksi = [];
         this.VIEW_TYPE = 1;
 
         this._mutasiRawHTML = '';
@@ -62,11 +63,6 @@ module.exports = class CekBRI {
                 this.getCaptcha(cb)
             }
             ],
-            // loginPersiapan: ['getCaptcha', (prev, cb) => {
-            //     this._step = 3;
-            //     this.loginPersiapan(cb)
-            // }
-            // ],
             login: ['getCaptcha', (prev, cb) => {
                 this._step = 3;
                 this.login(cb)
@@ -86,6 +82,16 @@ module.exports = class CekBRI {
                 this._step = 6;
                 this.logout(cb)
             }
+            ],
+            saveDB: ['logout', (prev, cb) => {
+                this._step = 7;
+                this.saveDB(cb)
+            }
+            ],
+            emailNew: ['saveDB', (prev, cb) => {
+                this._step = 8;
+                this.emailNew(prev.saveDB, cb)
+            }
             ]
         }, (err, finish_result) => {
             if (err) {
@@ -96,27 +102,102 @@ module.exports = class CekBRI {
             } else {
                 console.log('Done.');
                 this.curl.close();
-                this.getAllMutasi().forEach((mutasi, i, arr) => {
-                    const new_mutasi = { tgl: mutasi.tgl, trf_masuk: mutasi.kredit, saldo_saat_ini: mutasi.saldo }
-                    Mutasi.findOneAndUpdate(
-                        new_mutasi, 
-                        new_mutasi, 
-                        { upsert: true, new: true, setDefaultsOnInsert: true }, function (error, result) {
-                        if (error) return;
-                    });
-                })
-                (this.getAllMutasi().length)&&this._transporter.sendMail({
-                    from: this._config.email_sender_username,
-                    to: this._config.email_target,
-                    subject: `[Mutasi BRI App] Check on ${moment().format('HH:ss, DD/MM/YYYY')}`,
-                    text: JSON.stringify(this.getAllMutasi())
-                }, function (error, info) {
-                    if (error) {
-                        console.log(error);
-                    }
-                })
+                // this.getAllMutasi();
+                // this._transaksi.forEach((mutasi, i, arr) => {
+                //     if (mutasi.kredit) {
+                //         const new_mutasi = { tgl: moment(mutasi.tgl, 'DD/MM/YYYY'), trf_masuk: mutasi.kredit, saldo_saat_ini: mutasi.saldo }
+                //         console.log(mutasi, new_mutasi);
+                //         Mutasi.findOneAndUpdate(
+                //             new_mutasi,
+                //             new_mutasi,
+                //             { upsert: true, new: true, setDefaultsOnInsert: true }, function (error, result) {
+                //                 if (error) return;
+                //             });
+                //     }
+                // })
+                // (this._transaksi.length)&&this._transporter.sendMail({
+                //     from: this._config.email_sender_username,
+                //     to: this._config.email_target,
+                //     subject: `[Mutasi BRI App] Check on ${moment().format('HH:ss, DD/MM/YYYY')}`,
+                //     text: JSON.stringify(this._transaksi)
+                // }, function (error, info) {
+                //     if (error) {
+                //         console.log(error);
+                //     }
+                // })
             }
         })
+    }
+
+    emailNew(new_trx_masuk, cb) {
+        if (new_trx_masuk.length) {
+            let text = ''
+            new_trx_masuk.forEach((trx, i, arr) => {
+                text += `${moment(trx.tgl).format('DD/MM/YYYY')}:\nRp${trx.trf_masuk}\n${trx.nama_trx}\n\n`
+            })
+            this._transporter.sendMail({
+                from: this._config.email_sender_username,
+                to: this._config.email_target,
+                subject: `[Mutasi BRI App] Check on ${moment().format('HH:ss, DD/MM/YYYY')}`,
+                text
+            }, function (error, info) {
+                if (error) {
+                    console.log(error);
+                } else {
+                    console.log('Email sent');
+                    cb(null, 'email sent')
+                }
+            })
+        } else {
+            console.log('No new email sent');
+            cb(null, 'no new trx')
+        }
+    }
+
+    saveDB(cb) {
+        this.getAllMutasi();
+        if (this._transaksi.length) {
+            let task = []
+            let new_trx_masuk = []
+            this._transaksi.forEach((trx, i, arr) => {
+                task.push(
+                    (cb_t) => {
+                        if (trx.kredit) {
+                            Mutasi.findOne(
+                                { tgl: moment(trx.tgl, 'DD/MM/YYYY'), trf_masuk: trx.kredit, saldo_saat_ini: trx.saldo }, (error, result) => {
+                                    if (error) cb_t(err, null);
+                                    else if (!result) {
+                                        Mutasi.create(
+                                            { tgl: moment(trx.tgl, 'DD/MM/YYYY'), trf_masuk: trx.kredit, saldo_saat_ini: trx.saldo, nama_trx: trx.transaksi }
+                                            , (err_t, res_t) => {
+                                                new_trx_masuk.push(res_t)
+                                                cb_t(null, 'new');
+                                            })
+                                    } else {
+                                        cb_t(null, 'no new')
+                                    }
+                                });
+                        } else{
+                            cb_t(null, 'no trx masuk')
+                        }
+                    })
+            })
+            if (task.length) {
+                async.parallel(task, (err_f, final_f) => {
+                    if (err_f) cb(null, [])
+                    else {
+                        cb(null, new_trx_masuk)
+                    }
+                })
+            } else {
+                console.log('No new transaction');
+                cb(null, [])
+            }
+        }
+        else {
+            console.log('No new transaction');
+            cb(null, [])
+        }
     }
 
     prepareLogin(cb) {
@@ -278,7 +359,7 @@ module.exports = class CekBRI {
         this.curl.setOpt(Curl.option.POSTFIELDS, querystring.stringify(postData))
         this.curl.setOpt(Curl.option.VERBOSE, false)
         this.curl.setOpt(Curl.option.POST, 1)
-        this.curl.setOpt(Curl.option.URL, $('#frm1').attr('action') || `https://ib.bri.co.id/ib-bri/Br11600d.html` );
+        this.curl.setOpt(Curl.option.URL, $('#frm1').attr('action') || `https://ib.bri.co.id/ib-bri/Br11600d.html`);
         this.curl.on('end', (code, body, headers) => {
             if (this._step === 5) {
                 if (this._mutasiRawHTML.includes('ISO0003')) {
@@ -313,24 +394,23 @@ module.exports = class CekBRI {
         return this._status;
     }
 
-    getAllMutasi() {
+    getAllMutasi(cb) {
         if (!this._mutasiRawHTML.includes('ISO0003')) {
             let tableMutasi = this._mutasiDom('#tabel-saldo');
             let rows = tableMutasi.find('tbody').find('tr');
-            let transaksi = [];
             rows.each((i, tr) => {
                 let data = this._mutasiDom(tr).find('td');
                 if ((this._mutasiDom(data[0]).text()).match(/\d/)) {
-                    transaksi.push({
+                    this._transaksi.push({
                         tgl: this._mutasiDom(data[0]).text(),
-                        transaksi: this._mutasiDom(data[1]).text(),
+                        transaksi: this._mutasiDom(data[1]).text().replace(/^\s*/g, ''),
                         debet: this._mutasiDom(data[2]).text().replace(/\t|\s|\.|\,00/g, ''),
                         kredit: this._mutasiDom(data[3]).text().replace(/\t|\s|\.|\,00/g, ''),
                         saldo: this._mutasiDom(data[4]).text().replace(/\t|\s|\.|\,00/g, ''),
                     });
                 }
             })
-            return transaksi;
+            return this._transaksi;
         } else {
             return [];
         }
