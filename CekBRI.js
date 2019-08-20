@@ -105,7 +105,7 @@ module.exports = class CekBRI {
                         if (error) return;
                     });
                 })
-                this._transporter.sendMail({
+                (this.getAllMutasi().length)&&this._transporter.sendMail({
                     from: this._config.email_sender_username,
                     to: this._config.email_target,
                     subject: `[Mutasi BRI App] Check on ${moment().format('HH:ss, DD/MM/YYYY')}`,

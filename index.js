@@ -42,7 +42,7 @@ const CekBRI = require('./CekBRI');
 
 const schedule = require('node-schedule');
 
-const setiap_5menit = '*/3 * * * *';
+const setiap_5menit = '*/10 * * * *';
 
 schedule.scheduleJob(setiap_5menit, () => {
     const cek_bri = new CekBRI(config, transporter);
