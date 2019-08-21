@@ -53,7 +53,7 @@ app.get('/', (req, res) => {
     Mutasi.find({}).sort('-tgl').exec((err, resp)=>{
         let mutasi = '';
         resp.forEach((mts, i, arr)=>{
-            mutasi += `${moment(mts.tgl).format('DD/MM/YYYY')} => Rp${mts.trf_masuk} [${mts.nama_trx}]</br></br>`
+            mutasi += `${moment(mts.tgl).format('DD/MM/YYYY')}</br>Rp${mts.trf_masuk}</br>${mts.nama_trx}</br></br>`
         })
         res.send(mutasi);
     })
