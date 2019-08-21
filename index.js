@@ -50,10 +50,10 @@ schedule.scheduleJob(setiap_5menit, () => {
 
 const Mutasi = require('./model/mutasi.model')
 app.get('/', (req, res) => {
-    Mutasi.find({}, (err, resp)=>{
+    Mutasi.find({}).sort('-tgl').exec((err, resp)=>{
         let mutasi = '';
         resp.forEach((mts, i, arr)=>{
-            mutasi += `${mts.nama_trx}: Rp${mts.nama_trx}</br>`
+            mutasi += `${moment(mts.tgl).format('DD/MM/YYYY')} => Rp${mts.trf_masuk} [${mts.nama_trx}]</br></br>`
         })
         res.send(mutasi);
     })
